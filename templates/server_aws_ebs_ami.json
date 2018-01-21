@@ -1,0 +1,70 @@
+{
+    "variables": {
+        "access_key": "{{env `AWS_ACCESS_KEY_ID`}}",
+        "secret_key": "{{env `AWS_SECRET_ACCESS_KEY`}}",
+        "aws_region": "{{env `AWS_DEFAULT_REGION`}}",
+        "server_password": "{{ env `SERVER_PASSWORD`}}",
+        "server_version": "{{env `SERVER_VERSION`}}",
+        "s3_bucket": "{{env `S3_BUCKET`}}"
+    },
+    "builders": [
+        {
+            "type": "amazon-ebs",
+            "access_key": "{{user `access_key`}}",
+            "secret_key": "{{user `secret_key`}}",
+            "region": "{{user `aws_region`}}",
+            "source_ami_filter": {
+                "filters": {
+                    "virtualization-type": "hvm",
+                    "name": "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-*",
+                    "root-device-type": "ebs"
+                },
+                "owners": ["099720109477"],
+                "most_recent": true
+            },
+            "instance_type": "t2.medium",
+            "ssh_username": "ubuntu",
+            "ami_name": "minecraft-server-{{user `server_version`}}-{{timestamp}}",
+            "tags": {
+                "Latest": true,
+                "Application": "minecraft",
+                "Version": "{{user `server_version`}}"
+            }
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "file",
+
+            "destination": "/tmp/minecraft-server.service",
+            "source": "files/minecraft-server.service"
+        },
+        {
+            "type": "file",
+
+            "destination": "/tmp/s3_server_sync.py",
+            "source": "files/s3_server_sync.py"
+        },
+        {
+            "type": "file",
+
+            "destination": "/tmp/server_check.py",
+            "source": "files/server_check.py"
+        },
+        {
+            "type": "shell",
+
+            "environment_vars": [
+                "SERVER_PASSWORD={{user `server_password`}}",
+                "SERVER_VERSION={{user `server_version`}}",
+                "S3_BUCKET={{user `s3_bucket`}}"
+            ],
+            "execute_command": "chmod +x {{ .Path }}; sudo {{ .Vars }} {{ .Path }}",
+            "scripts": [
+                "scripts/00-prereqs.sh",
+                "scripts/01-configure.sh",
+                "scripts/02-verify.bats"
+            ]
+        }
+    ]
+}
